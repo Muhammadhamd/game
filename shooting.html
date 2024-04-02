@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Canvas Animation Example</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="480" height="320"></canvas>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let opponentSpeed = .5
+    let x = canvas.width / 2;
+    let y = canvas.height / 2; // Start in the middle of the canvas
+    let rotationAngle = -90; // The rotation angle of the circle
+    let speed = 1; // Speed of the circle's movement
+    let bullets = []; // Array to hold bullets
+    let opponents = [];
+const numberOfOpponents = 5; // Adjust this value based on how many opponents you want
+
+for (let i = 0; i < numberOfOpponents; i++) {
+    opponents.push({
+        ox: Math.random() * canvas.width,
+        oy: Math.random() * canvas.height,
+        radius: 10 // Assuming each opponent has a fixed radius of 20
+    });
+}
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotationAngle * Math.PI / 180);
+
+        // Assuming the blue side is now drawn to face "forward" correctly
+        // Draw the blue half (forward)
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, Math.PI / 2, -Math.PI / 2, false); // Blue side
+        ctx.fillStyle = "#0095DD";
+        ctx.fill();
+
+        // Draw the black half (backward)
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, -Math.PI / 2, Math.PI / 2, false); // Black side
+        ctx.fillStyle = "black";
+        ctx.fill();
+
+        ctx.restore();
+        drawOpponent()
+        drawBullets();
+        requestAnimationFrame(draw);
+    }
+
+    const keysPressed = {
+        ArrowUp: false,
+        ArrowDown: false,
+        ArrowLeft: false,
+        ArrowRight: false
+    };
+
+    document.addEventListener("keyup",(e)=>{
+        if (e.code === "space" || e.code === "Space") {
+            let rad = rotationAngle * Math.PI / 180; // Convert angle to radians
+            let bulletSpeed = 5; // Speed of bullets
+            bullets.push({
+                bx: x,
+                by: y,
+                bdx: Math.cos(rad) * bulletSpeed,
+                bdy: Math.sin(rad) * bulletSpeed
+            });
+        }
+    })
+    document.addEventListener('keydown', (e) => {
+        keysPressed[e.key] = true;
+
+        
+    });
+
+    document.addEventListener('keyup', (e) => {
+        keysPressed[e.key] = false;
+    });
+
+    function updatePosition() {
+        if (keysPressed.ArrowLeft) {rotationAngle -= 5 
+        
+        }; // Rotate left
+        if (keysPressed.ArrowRight) {rotationAngle += 5;
+        
+        } // Rotate right
+
+        // if ((keysPressed.ArrowLeft || keysPressed.ArrowRight) && keysPressed.ArrowUp) {
+        //     speed -= speed > 0 ? .003 : 0;
+        // }
+        // if ((!keysPressed.ArrowLeft && !keysPressed.ArrowRight) && keysPressed.ArrowUp) {
+        //     speed += speed < 2 ? 0.03 : 0;
+        // }
+        if (keysPressed.ArrowUp) {
+            console.log(speed)
+            // Move forward in the current direction
+            let rad = rotationAngle * Math.PI / 180; // Convert angle to radians
+            x += Math.cos(rad) * speed;
+            y += Math.sin(rad) * speed;
+        }
+
+        // if ((keysPressed.ArrowLeft || keysPressed.ArrowRight) && keysPressed.ArrowDown) {
+        //     speed -= speed > 0 ? .001 : 0;
+        // }
+        // if ((!keysPressed.ArrowLeft && !keysPressed.ArrowRight) && keysPressed.ArrowUp) {
+        //     speed += speed < 1 ? 0.03 : 0;
+        // }
+        if (keysPressed.ArrowUp) {
+            // Move forward in the current direction
+            let rad = rotationAngle * Math.PI / 180; // Convert angle to radians
+            x += Math.cos(rad) * speed;
+            console.log(x,"aftrex")
+            y += Math.sin(rad) * speed;
+        }
+
+        // Clamp values of x and y to the boundaries of your canvas
+
+        updateOpponentsPosition()
+        x = Math.max(10, Math.min(canvas.width - 10, x));
+        y = Math.max(10, Math.min(canvas.height - 10, y));
+    }
+
+    function drawOpponent() {
+    opponents.forEach((opponent, index) => {
+        // Draw each opponent
+        ctx.beginPath();
+        ctx.arc(opponent.ox, opponent.oy, opponent.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "black"; // Or any color you want for opponents
+        ctx.fill();
+
+        // Check for collisions with each bullet
+        for (let i = 0; i < bullets.length; i++) {
+            let dx = bullets[i].bx - opponent.ox;
+            let dy = bullets[i].by - opponent.oy;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < opponent.radius + 2) { // Assuming bullet radius is 2
+                console.log("done");
+
+                // Optional: Remove the bullet and opponent on collision
+                bullets.splice(i, 1); // Remove the bullet
+                opponents.splice(index, 1); // Remove the opponent
+                i--; // Adjust the index after removal
+                break; // Exit the loop after handling collision
+            }
+        }
+    });
+}
+
+    function drawBullets() {
+        bullets.forEach(bullet => {
+            ctx.beginPath();
+            ctx.arc(bullet.bx, bullet.by, 2, 0, Math.PI * 2); // Draw bullet as small circle
+            ctx.fillStyle = "yellow"; // Bullet color
+            ctx.fill();
+        });
+
+        // Update bullet positions
+        bullets = bullets.map(bullet => ({
+            bx: bullet.bx + bullet.bdx,
+            by: bullet.by + bullet.bdy,
+            bdx: bullet.bdx,
+            bdy: bullet.bdy
+        })).filter(bullet => 
+            bullet.bx > 0 && bullet.bx < canvas.width &&
+            bullet.by > 0 && bullet.by < canvas.height
+        ); // Keep bullets within canvas
+    }
+    
+function updateOpponentsPosition() {
+    opponents.forEach(opponent => {
+        let directionX = x - opponent.ox; // Calculate direction vector towards the user
+        let directionY = y - opponent.oy;
+
+        // Normalize direction vector
+        let magnitude = Math.sqrt(directionX * directionX + directionY * directionY);
+        if (magnitude > 0) { // Avoid division by zero
+            directionX /= magnitude;
+            directionY /= magnitude;
+        }
+
+        // Move opponent towards the user
+        opponent.ox += directionX * opponentSpeed;
+        opponent.oy += directionY * opponentSpeed;
+    });
+}
+
+    function gameLoop() {
+        updatePosition();
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+    draw();
+</script>
+</body>
+</html>
