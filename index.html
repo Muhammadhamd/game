@@ -1,0 +1,186 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <title>Box Conqueror Game</title>
+    <style>
+        #game {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 100px); /* Creates a flexible number of columns based on the container's width */
+    grid-gap: 2px; /* Smaller gap for a tighter grid */
+    justify-content: center; /* Center the grid within the game area */
+    background-color: #000; /* Assuming this represents oceans or non-country areas */
+    padding: 10px;
+}
+
+.box {
+    width: 100px;
+    height: 100px;
+    background-color: #f0f0f0; /* Default color, consider varying this per box for more map-like diversity */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    border: 1px solid #ddd; /* Slightly visible borders to distinguish boxes */
+}
+
+.conquered {
+    background-color: red; /* Differentiates conquered countries */
+}
+    </style>
+</head>
+<body>
+    <div id="days"></div>
+    <div id="score"></div>
+    <div id="selectedBaseInfo">
+
+    </div>
+    
+    <div>
+        <button id="btn" onclick="nextstep()">nextstep</button>
+        <button id="btn" onclick="plusscore()">Add Score</button>
+    </div>
+<div id="game"></div>
+
+<script>
+    let selectedBase;
+    async function getRandomCountry(a) {
+       
+        try {
+            console.log(a)
+       const response = await fetch('country.json')
+       const data = await response.json()
+  
+    return data[a]
+            
+        } catch (error) {
+            console.log(error)
+        }
+      
+
+                
+               
+    }
+    document.addEventListener("DOMContentLoaded",()=>{
+                        
+
+    })
+    async function initializeGame() {
+        const gameArea = document.getElementById('game');
+        const userBoxIndex = Math.floor(Math.random() * 6); // Random index for user box
+        for (let i = 0; i < 60; i++) {
+            const countryis =await getRandomCountry(i)
+            const power = Math.floor(Math.random() * 90) + 10; // Power between 10 and 100
+            const box = document.createElement('div');
+            box.className = 'box';
+            box.innerHTML = `<div>${countryis}</div><div id="power">${power}</div>`;
+            box.setAttribute('data-country', countryis);
+
+            box.onclick = function() { conquerBox(i, power); };
+            if (i === userBoxIndex) {
+            box.onclick = function() { myTeam(i); };
+
+                document.getElementById("selectedBaseInfo").innerHTML = `
+                <h1>${countryis}</h1>
+                <h2>Power:${power}</h2>
+                `
+                selectedBase = {
+                    country:countryis,
+                    power:power,
+                    score:0,
+                    index:i
+                }
+                box.style.backgroundColor = 'green'; // User's box
+                box.setAttribute('data-user', 'true');
+                box.setAttribute('data-power', power);
+
+            } else {
+                box.setAttribute('data-power', power);
+            }
+            gameArea.appendChild(box);
+        }
+    }
+
+    function conquerBox(index, power) {
+        console.log("safa")
+        const boxes = document.querySelectorAll('.box');
+        const userBox = document.querySelector('[data-user="true"]');
+        if (boxes[index].classList.contains('conquered')) return; // Already conquered
+        if (parseInt(selectedBase.power) > power) {
+            boxes[index].classList.add('conquered');
+            boxes[index].onclick = function(){
+                myTeam(index)
+            };
+        }
+    }
+
+    function myTeam(i) {
+        console.log(i)
+        const boxes = document.querySelectorAll('.box');
+
+        for (let f = 0; f < boxes.length; f++) {
+            if(boxes[f]?.getAttribute("data-selected") && !boxes[i]?.getAttribute("data-selected")){
+            boxes[f].removeAttribute("data-selected")
+            break
+            }
+            
+        }
+
+        selectedBase = {
+            ...selectedBase,
+            country:boxes[i].getAttribute("data-country"),
+            power:boxes[i].getAttribute("data-power"),
+            index:i
+
+        }
+        document.getElementById("selectedBaseInfo").innerHTML = `
+                <h1 id="country">${boxes[i].getAttribute("data-country")}</h1>
+                <h2 id="power">Power:${boxes[i].getAttribute("data-power")}</h2>
+                `
+                boxes[i].setAttribute("data-selected", "true");
+
+    }
+
+    function nextstep()
+{
+    console.log(selectedBase)
+    let i =10;
+    let points = selectedBase.score;
+    let score = points + i;
+    selectedBase.score = Number(score)
+    document.getElementById('score').innerHTML = `Score is :${score}`;
+
+
+    /*for days function*/
+    let increase = 1;
+    let days = parseInt(document.getElementById("days").innerHTML);
+    days = isNaN(days) ? 0 : days;
+    let dayonstep = days + increase;
+    document.getElementById("days").innerHTML = dayonstep + "day";
+
+    alert(dayonstep + "day");
+}
+
+
+function plusscore(){
+
+    let boxes = document.querySelector('.box[data-selected="true"]')
+    boxes.setAttribute("data-power",(Number(boxes.getAttribute("data-power")) + Number(selectedBase.score)))
+    UpdateTheScoreAndPower()
+    console.log(boxes.getAttribute("data-power"))
+    console.log(selectedBase.score)
+
+    // boxes.getElementById("power").innerHTML =  boxes.getAttribute("data-power")
+    // changeState(selectedBase.index)
+
+
+  document.getElementById("score").value = 0;
+  selectedBase.score = 0
+}
+
+ function UpdateTheScoreAndPower(){
+  document.querySelector('.box[data-selected="true"] #power').innerHTML = document.querySelector('.box[data-selected="true"]').getAttribute("data-power")
+ }
+    window.onload = initializeGame;
+</script>
+</body>
+</html> -->

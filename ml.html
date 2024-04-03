@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+  <script src="//unpkg.com/brain.js"></script>
+  <body>
+    <h1>Deep Learning with brain.js</h1>
+    <div id="demo"></div>
+
+    <script>
+      // Assuming brain.js is properly imported and initialized
+      const net = new brain.NeuralNetwork();
+      const userAgePreference = new brain.NeuralNetwork();
+
+      // Training data for the userAgePreference neural network
+      const AgePreferenceTrainingData = [
+      
+  // Existing entries
+  { input: { age: 30, averagePreference: 30 }, output: { agePreference: 1 } },
+  { input: { age: 30, averagePreference: 45 }, output: { agePreference: 0.85 } },
+  { input: { age: 20, averagePreference: 15 }, output: { agePreference: 0.95 } },
+  { input: { age: 40, averagePreference: 30 }, output: { agePreference: 0.9 } },
+  // Hypothetical new entries
+  { input: { age: 25, averagePreference: 35 }, output: { agePreference: 0.8 } },
+  { input: { age: 35, averagePreference: 25 }, output: { agePreference: 0.75 } },
+  // Add as many as needed...
+];
+      
+
+      // Train the age preference neural network
+      userAgePreference.train(AgePreferenceTrainingData);
+
+      // Function to calculate user age preference
+      const getUserAgePreference = (user1, user2) => {
+        const user2AgeRange = user2.ageRange.split("-").map(Number);
+        const user2AveragePreference =
+          (user2AgeRange[0] + user2AgeRange[1]) / 2;
+
+        const user1AgeRange = user1.ageRange.split("-").map(Number);
+        const user1AveragePreference =
+          (user1AgeRange[0] + user1AgeRange[1]) / 2;
+
+        const user1AgePreference = userAgePreference.run({
+          age: user1.age,
+          averagePreference: user2AveragePreference,
+        });
+
+        const user2AgePreference = userAgePreference.run({
+          age: user2.age,
+          averagePreference: user1AveragePreference,
+        });
+
+        // Debugging logs
+        console.log("User 1 Age Preference:", user1AgePreference.agePreference);
+        console.log("User 2 Age Preference:", user2AgePreference.agePreference);
+
+        return (
+          (user1AgePreference.agePreference +
+            user2AgePreference.agePreference) /
+          2
+        );
+      };
+
+      // Training data for the main neural network
+      const trainingData = [
+      { input: [1, 0, 1], output: { match: 0.75 } },
+  { input: [0, 1, 1], output: { match: 0.75 } },
+  { input: [0, 0, 1], output: { match: 0.4 } },
+  { input: [1, 1, 1], output: { match: 1 } },
+  // Hypothetical new entries
+  { input: [1, 0, 0], output: { match: 0.5 } },
+  { input: [0, 1, 0], output: { match: 0.55 } },
+      ];
+
+      // Train the main neural network
+      net.train(trainingData);
+
+      // Function to predict match percentage between two users
+      function predictMatchPercentage(user1, user2) {
+        const agePreference = getUserAgePreference(user1, user2);
+        console.log(agePreference);
+        const input = [
+          user1.interests.includes("hiking") ? 1 : 0,
+          user1.interests.includes("reading") ? 1 : 0,
+          user1.interests.includes("cooking") ? 1 : 0,
+        ];
+        const output = net.run(input);
+        console.log(output.match);
+        return ((output.match + agePreference) / 2) * 100;
+      }
+
+      // Example users
+      const user1 = {
+        age: 500,
+        ageRange: "30-50",
+        interests: ["hiking", "reading", "cooking"],
+      };
+
+      const user2 = {
+        age: 30,
+        ageRange: "30-50",
+        interests: ["reading", "cooking"],
+      };
+
+      // Call the function to predict match percentage
+      console.log(predictMatchPercentage(user1, user2));
+    </script>
+  </body>
+</html>
