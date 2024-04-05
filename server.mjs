@@ -14,13 +14,14 @@ app.use(express.json())
 app.use(cookieParser())
 const server = http.createServer(app)
 const io = new Server(server)
-const connectedSockets = [];
+let connectedSockets = [];
+let ballData = {x:500,y:150,dx:0,dy:0,speed:0}
 app.use(express.static(path.join(__dirname,'/onlineshooting.html')))
 
 app.get("/",(req,res)=>{
     
     res.sendFile(path.join(__dirname,"/onlineshooting.html"))
-    console.log(path.join(__dirname,"/onlineshooting.html"))
+    // console.log(path.join(__dirname,"/onlineshooting.html"))
 })
 
  
@@ -30,35 +31,66 @@ app.get("/",(req,res)=>{
 
 
 io.on('connection', (socket) => {
-    console.log('A user connected',socket.id);
-    connectedSockets.push(socket.id);
+    console.log('A user connected',connectedSockets);
+    connectedSockets.push({
+        id:socket.id,
+        x:(Math.random()*1000),
+        y:(Math.random()*300),
+        rotationalAngle:0,
+    });
+    socket.on('updateBallPosition', (data) => {
+        console.log(data)
+        // Broadcast the new ball position to all clients except the sender
+        ballData = {
+            ...ballData,
+            ...data,
+        }
+        console.log(ballData)
+        socket.broadcast.emit('ballPositionUpdated', ballData);
+    });
+  
+    io.emit("newConnections", connectedSockets , ballData);
+
     socket.on('disconnect', () => {
-        console.log('User disconnected');
 
         // Remove the disconnected socket ID from the array
-        const index = connectedSockets.indexOf(socket.id);
-        if (index !== -1) {
-            connectedSockets.splice(index, 1);
-        }
+
+        connectedSockets = connectedSockets.filter((soc)=>soc.id !== socket.id);
+
+        // Broadcast the updated list after disconnection
+        socket.broadcast.emit("disconnectuser", connectedSockets);
     });
 
-    socket.on('join-room', (room) => {
-        const {reciver,sender} = room
-        if (io.sockets.adapter.rooms.get(`${reciver}-${sender}`)) {
-         socket.join(`${reciver}-${sender}`)
-        room = `${reciver}-${sender}`
+    // socket.on('join-room', (room) => {
+    //     const {reciver,sender} = room
+    //     if (io.sockets.adapter.rooms.get(`${reciver}-${sender}`)) {
+    //      socket.join(`${reciver}-${sender}`)
+    //     room = `${reciver}-${sender}`
 
-        }else{
-         socket.join(`${sender}-${reciver}`)
-        room = `${sender}-${reciver}`
+    //     }else{
+    //      socket.join(`${sender}-${reciver}`)
+    //     room = `${sender}-${reciver}`
             
-        }
-        console.log(`Socket ${socket.id} joined room ${room}`);
+    //     }
         
-    });
+    // });
+    socket.on("changing",({ballx,bally})=>{
+        socket.broadcast.emit("onchangeListen",{
+            ballx,
+            bally
+        })
+    })
+    socket.on("hit",(hit)=>{
+        socket.broadcast.emit("onBallHit","hithofaya")
+    })
 
+    socket.on("updateAllState",(state)=>{
+        socket.broadcast.emit("clientSideUpdate",state)
+        connectedSockets = state
+    })
     // ... other event listeners ...
 });
+
 
 
 server.listen(PORT, ()=>{

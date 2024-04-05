@@ -15,60 +15,119 @@
 <body>
 
     <canvas id="gameCanvas" width="1000" height="300"></canvas>
-
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let massUser = 1000
-        let massBall = 200
+        let massUser = 1000;
+        let massBall = 200;
         let x = canvas.width / 2;
         let y = canvas.height / 2;
-        let ux = canvas.width / 2;
-        let uy = canvas.height - 60;
-        let dx = 2; // Horizontal velocity of the blue ball
-        let dy = -2; // Vertical velocity of the blue ball
+        let canmove = true
+        let eux=0;
+        let euy=0;
+        let dx = 2;
+        let dy = -2;
         let speed = 0;
-        let userSpeed = 0 // Initial speed of the user (black ball)
-        let rotationAngle = 0; // User's rotation angle
-        let keysPressed = {}; // Tracks which keys are pressed
+        let userSpeed = 0;
+        let lastCollisionOpponent=null
+        let rotationAngle = 0;
+        let currentUserID = ''
+        let keysPressed = {};
+        const interpolationFactor = 0.05; // Control smoothing speed
+        let sockets = []
+        const socket = io(); // Ensure correct server addres
+        socket.on("connect", () => {
+            console.log(socket.id); 
+            currentUserID = socket.id
+        });
 
-        function drawUserBall(x, y, size, rotationAngle) {
-            // Save the current state of the canvas
+        // Listen for global position updates
+        // socket.on("onchangeListen", (data) => {
+        //     // Update target position for interpolation
+        //     targetX = data.ballx;
+        //     targetY = data.bally;
+        // });
+        socket.on("newConnections",(socketsare , balldata)=>{
+            console.log(socketsare)
+            x = balldata.x 
+            y=balldata.y 
+            dx=balldata.dx
+            dy=balldata.dy
+            speed = balldata.speed
+            sockets = []
+
+            sockets.push(...socketsare)
+        })
+        socket.on("disconnectuser",(socketsare)=>{
+            console.log(socketsare)
+            sockets = []
+            sockets.push(...socketsare)
+        })
+    
+        function drawUserBall(x, y, size, therotationAngle ,id) {
+            // console.log(x,y,"++++++++++++++++++++++==")
+            if (id == socket.id) {
+                eux =x
+                euy =y
+                // console.log(rotationAngle,"+++++++=befo")
+                rotationAngle = therotationAngle
+                // rotationAngle = therotationAngle1
+                // console.log(rotationAngle)
+                // console.log(userSpeed,"_+++++++++++++speed")
+            }
             ctx.save();
-
-            // Translate to the ball's location
             ctx.translate(x, y);
-            // Rotate the canvas by the specified rotation angle
-            ctx.rotate(rotationAngle * Math.PI / 180);
-
-            // Draw the left half (black)
+            ctx.rotate(therotationAngle * Math.PI / 180);
             ctx.beginPath();
             ctx.arc(0, 0, size, 0.5 * Math.PI, 1.5 * Math.PI, false);
-            ctx.lineTo(0, -size); // Line back to the starting point
+            ctx.lineTo(0, -size);
             ctx.fillStyle = 'black';
             ctx.fill();
-
-        
-
-            // Draw the right half (blue)
             ctx.beginPath();
             ctx.arc(0, 0, size, -0.5 * Math.PI, 0.5 * Math.PI, false);
-            ctx.lineTo(0, size); // Line back to the starting point
-            ctx.fillStyle = '#0095DD'; // Blue color
+            ctx.lineTo(0, size);
+            ctx.fillStyle = id == socket.id ? 'yellow':'#0095DD';
             ctx.fill();
-
-            // Restore the saved state of the canvas
             ctx.restore();
         }
+        function placeBallInFrontOfUser() {
+    // Calculate the front position based on the user's rotation angle
+    let rad = rotationAngle * Math.PI / 180;
+    let distanceToFront = 30; // Distance from the user to where the ball should be placed
+    
+    x = eux + Math.cos(rad) * distanceToFront;
+    y = euy + Math.sin(rad) * distanceToFront;
+
+    // Since the ball is now being controlled in relation to the user,
+    // you might want to stop its independent movement by setting speed to 0 or a fixed value,
+    // depending on your specific needs.
+    dx = 0;
+    dy = 0;
+    speed = 0; // Optionally stop the ball's independent movement
+}
+socket.on('ballPositionUpdated', (data) => {
+        // Update the ball's position with the received data
+        x = data.x ;
+        y = data.y;
+        dx=data.dx,
+        dy=data.dy
+        speed = data.speed
+    });
 
         function draw() {
+
+           
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawBall(x, y, "#0095DD", 10); // Draw blue ball
-            drawUserBall(ux, uy, 20, rotationAngle); // Draw black ball (user)
 
-            checkCollision(); // Check for collision and respond
-
-            // Update blue ball position
+            // // Interpolate blue ball's position for smooth update
+            // x += (targetX - x) * interpolationFactor;
+            // y += (targetY - y) * interpolationFactor;
+    
+            sockets.forEach((socketid)=>{
+                  drawUserBall(socketid.x,socketid.y, 20, socketid.rotationalAngle , socketid.id);
+            })
+            drawBall(x, y, "#0095DD", 10);
             speed = Math.min(Math.max(speed, 0), 10)
             speed = speed > 0 ? (speed - 0.02) : speed < 0 ? Math.floor(speed + 0.2) : Math.floor(speed)
             if (x + dx * speed > canvas.width - 10 || x + dx * speed < 10) {
@@ -80,10 +139,12 @@
             x += dx * speed;
             y += dy * speed;
 
-            updatePosition(); // Update user (black ball) position
+    
+            checkCollision();
+            updatePosition();
             requestAnimationFrame(draw);
         }
-
+    
         function drawBall(x, y, color, size) {
             ctx.beginPath();
             ctx.arc(x, y, size, 0, Math.PI * 2);
@@ -91,81 +152,184 @@
             ctx.fill();
             ctx.closePath();
         }
+        function KickAball() {
+    let dxi = x - eux;
+    let dyi = y - euy;
+    let distance = Math.sqrt(dxi * dxi + dyi * dyi);
+    if (distance < 45) { // Ensure proximity to the ball is close enough to kick
+        speed = 6
 
-        document.addEventListener('keydown', (e) => {
+        let rad = rotationAngle * Math.PI / 180; // Convert rotation angle to radians
+        // Normalize direction vector and apply the desired speed of 6
+        dx = Math.cos(rad)  ; // New velocity in x-direction with speed of 6
+        dy = Math.sin(rad) ;  // New velocity in y-direction with speed of 6
+        console.log(dx,"dx",dy,"dy")
+        // Emit the updated position and velocity to the server
+        socket.emit('updateBallPosition', { x, y, dx, dy,speed });
+
+        // Optionally, immediately apply the update locally to make the kick feel more responsive
+        // Note: This local update might be overwritten by the server's authoritative update
+        x += dx ;
+        y += dy ;
+
+    }
+}
+document.addEventListener('keydown', (e) => {
             keysPressed[e.key] = true;
-            if (e.key === "m") {
-                speed = 0.1;
-            } else if (e.key === "n") {
-                speed = Math.max(0.1, speed - 0.1);
-            }
         });
-
+    
         document.addEventListener('keyup', (e) => {
             keysPressed[e.key] = false;
         });
-
+    
         function updatePosition() {
+            let findIndexToUpdate = sockets.findIndex((so)=>so.id == socket.id)
             if (keysPressed['ArrowLeft']) rotationAngle -= 5;
             if (keysPressed['ArrowRight']) rotationAngle += 5;
             if (keysPressed['ArrowUp']) {
-                userSpeed = userSpeed <= 5 ? userSpeed + 0.4 : userSpeed
+                userSpeed = (userSpeed <= 5 && canmove) ? userSpeed + 0.4 : userSpeed
                 let rad = rotationAngle * Math.PI / 180;
-                ux += Math.cos(rad) * userSpeed;
-                uy += Math.sin(rad) * userSpeed;
+                eux += Math.cos(rad) * userSpeed;
+                euy += Math.sin(rad) * userSpeed;
+                if (sockets?.length > 0) {
+            socket.emit("updateAllState",sockets)
+                    
+                }
+
             }
 
             if (!keysPressed['ArrowUp'] && Math.floor(userSpeed) >= 0) {
                 userSpeed = userSpeed - 0.1
                 let rad = rotationAngle * Math.PI / 180;
-                ux += Math.cos(rad) * userSpeed;
-                uy += Math.sin(rad) * userSpeed;
+                eux += Math.cos(rad) * userSpeed;
+                euy += Math.sin(rad) * userSpeed;
+                if (sockets?.length > 0) {
+            socket.emit("updateAllState",sockets)
+                    
+                }
+               
             }
 
-            // Ensure the black ball stays within canvas bounds
-            ux = Math.max(10, Math.min(canvas.width - 10, ux));
-            uy = Math.max(10, Math.min(canvas.height - 10, uy));
+            if (keysPressed['k']) {
+                console.log("fcsZf")
+                KickAball()
+            }
+            for (let i = 0; i < sockets.length; i++) {
+        let opponent = sockets[i];
+        if (opponent.id !== socket.id) {
+            let dx = opponent.x - eux;
+            let dy = opponent.y - euy;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 45) {
+                userSpeed = 0;
+                canmove = false;
+                lastCollisionOpponent = { x: dx, y: dy }; // Store direction to opponent at collision
+                break; // Exit the loop after finding the first collision
+            }
         }
+    }
 
+    // Check if the user is facing away from the last collision opponent to allow movement
+    if (!canmove && lastCollisionOpponent) {
+        let rad = rotationAngle * Math.PI / 180;
+        let facingX = Math.cos(rad); // Direction user is facing
+        let facingY = Math.sin(rad);
+
+        // Normalize the last collision direction vector
+        let mag = Math.sqrt(lastCollisionOpponent.x * lastCollisionOpponent.x + lastCollisionOpponent.y * lastCollisionOpponent.y);
+        let collisionDirX = lastCollisionOpponent.x / mag;
+        let collisionDirY = lastCollisionOpponent.y / mag;
+
+        // Dot product to determine if facing away
+        let dot = facingX * collisionDirX + facingY * collisionDirY;
+        if (dot < 0.8) { // If dot product is negative, directions are opposite
+            canmove = true;
+        }
+    }
+
+  
+    // Ensure the user ball stays within canvas bounds
+    eux = Math.max(10, Math.min(canvas.width - 10, eux));
+    euy = Math.max(10, Math.min(canvas.height - 10, euy));
+
+    // Update the user state in sockets array
+    if (sockets[findIndexToUpdate]) {
+        sockets[findIndexToUpdate] = {
+            ...sockets[findIndexToUpdate],
+            x: eux,
+            y: euy,
+            rotationalAngle: rotationAngle,
+            speed: userSpeed
+        };
+    } // Ensure the black ball stays within canvas bounds
+            eux = Math.max(10, Math.min(canvas.width - 10, eux));
+            euy = Math.max(10, Math.min(canvas.height - 10, euy));
+
+            if (sockets[findIndexToUpdate]) {
+                    sockets[findIndexToUpdate] = {
+                    ...sockets[findIndexToUpdate],
+                    x:eux,
+                    y:euy,
+                    rotationalAngle:rotationAngle,
+                    speed:userSpeed
+                }
+               
+            }
+   
+                
+       
+        }
+       
         function checkCollision() {
-            let dxi = x - ux;
-            let dyi = y - uy;
+            let dxi = x - eux;
+            let dyi = y - euy;
             let distance = Math.sqrt(dxi * dxi + dyi * dyi);
 
-            if (distance < 30) { // Adjusted for the size of the black ball
-                // Calculate relative velocity components
-                let vectorToBlueBall = { x: dx, y: dy };
-                let userDirection = {
-            x: Math.cos(rotationAngle * Math.PI / 180),
-            y: Math.sin(rotationAngle * Math.PI / 180)
-        };
+            // if (distance < 30) { // Adjusted for the size of the black ball
+            //     // Calculate relative velocity components
+            //     console.log("takragaya")
+            //     // let relativeVx = (dx * speed - Math.cos(rotationAngle * Math.PI / 180) * userSpeed )* 0.5;
+            //     // let relativeVy = (dy * speed - Math.sin(rotationAngle * Math.PI / 180) * userSpeed)*0.5;
+            //     let relativeVx = (((massUser * Math.cos(rotationAngle * Math.PI / 180) * userSpeed) + (speed * massBall * Math.cos(rotationAngle * Math.PI / 180)))/massBall)*0.8
+            //     let relativeVy = (((massUser * Math.sin(rotationAngle * Math.PI / 180) * userSpeed) + (speed * massBall * Math.sin(rotationAngle * Math.PI / 180)))/massBall)*0.8
 
-        // Dot product to determine if the blue ball is in front of the user ball
-        let dotProduct = vectorToBlueBall.x * userDirection.x + vectorToBlueBall.y * userDirection.y;
+            //     // Calculate magnitude of the relative velocity (impact speed)
+            //     let impactSpeed = Math.sqrt(relativeVx * relativeVx + relativeVy * relativeVy);
+            //     console.log(impactSpeed)
+            //     // Update the speed of the blue ball based on the impact speed
+            //     speed = impactSpeed; // You can adjust the division factor to your liking
 
+            //     // Reverse the direction of the blue ball
+            //     dx = -dx;
+            //     dy = -dy;
 
-                // let relativeVx = (dx * speed - Math.cos(rotationAngle * Math.PI / 180) * userSpeed )* 0.5;
-                // let relativeVy = (dy * speed - Math.sin(rotationAngle * Math.PI / 180) * userSpeed)*0.5;
-                let relativeVx = (((massUser * Math.cos(rotationAngle * Math.PI / 180) * userSpeed) + (speed * massBall * Math.cos(rotationAngle * Math.PI / 180)))/massBall)*0.5
-                let relativeVy = (((massUser * Math.sin(rotationAngle * Math.PI / 180) * userSpeed) + (speed * massBall * Math.sin(rotationAngle * Math.PI / 180)))/massBall)*0.5
+            //     // Move the blue ball out of collision
+            //     x += dx * speed;
+            //     y += dy * speed;
+            // }
+        
 
-                // Calculate magnitude of the relative velocity (impact speed)
-                let impactSpeed = Math.sqrt(relativeVx * relativeVx + relativeVy * relativeVy);
-                // Update the speed of the blue ball based on the impact speed
-                speed = dotProduct < 0? impactSpeed : speed; // You can adjust the division factor to your liking
-
-                // Reverse the direction of the blue ball
-                dx = -dx;
-                dy = -dy;
-
-                // Move the blue ball out of collision
-                x += dx * speed;
-                y += dy * speed;
+            if (distance < 30) {
+                placeBallInFrontOfUser()
+                socket.emit('updateBallPosition', { x, y });
             }
         }
+    
+        socket.on("clientSideUpdate",(players)=>{
+    // Log incoming player data for debugging
 
+    // Filter out the current client's data from the incoming players array
+    const updatedPlayers = players.filter(player => player.id !== socket.id);
+
+    // Replace the content of the `sockets` array with the updated players
+    // This assumes you want to keep the current client's data and merge others
+    sockets = [...sockets.filter(socket => socket.id === currentUserID), ...updatedPlayers];
+
+    // Trigger any necessary UI updates or state changes here
+});
         draw();
     </script>
+    
 </body>
 
 </html>
